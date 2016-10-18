@@ -9,7 +9,7 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 
-executable tinywm:
+executable tinywm
 
   main-is:           Main.hs
 
