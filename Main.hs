@@ -121,8 +121,9 @@ onMotionNotify MkMotionNotifyEvent{..} = do
                 vals = case motion of
                     Moving x0 y0 -> [(ConfigWindowX, fromIntegral $ x0 + xdiff), (ConfigWindowY, fromIntegral $ y0 + ydiff)]
                     Resizing width0 height0 ->
-                        let or1 n = fromIntegral $ if n > 1 then n else 1
-                            width = or1 $ fromIntegral width0 + xdiff
-                            height = or1 $ fromIntegral height0 + ydiff
+                        -- TODO weird behavior at small widths
+                        let bound n = fromIntegral $ if n > 64 then n else 64
+                            width = bound $ (fromIntegral width0 :: Int16) + xdiff
+                            height = bound $ (fromIntegral height0 :: Int16) + ydiff
                         in [(ConfigWindowWidth, width), (ConfigWindowHeight, height)]
             notify $ MkConfigureWindow win $ toValueParam vals
