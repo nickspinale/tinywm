@@ -12,8 +12,6 @@ import Data.Word
 import Data.Maybe
 import Data.Foldable
 import System.Exit
-import System.IO
-import System.Process
 
 import Graphics.XHB
 import Graphics.XHB.Connection
@@ -29,7 +27,6 @@ main = connect >>= maybe (die "failed to connect to x server") (setCrashOnError 
 
 tinywm :: (MonadX IO m, MappingCtx m) => m ()
 tinywm = void $ do
-    liftX $ hSetBuffering stdout LineBuffering
     root <- asksX getRoot
     km <- getsMapping keyMap
     forM_ (keyCodesOf xK_x km) $ \kc -> notify $ MkGrabKey True root [ModMask1] kc GrabModeAsync GrabModeAsync

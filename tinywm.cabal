@@ -14,12 +14,9 @@ executable tinywm
   main-is:           Main.hs
 
   build-depends:     base
+                   , mtl
+                   , transformers
                    , xhb
                    , xhb-keysyms
                    , xhb-monad
                    , xhb-mapping-state
-                   , array
-                   , containers
-                   , transformers
-                   , mtl
-                   , process

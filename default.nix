@@ -1,5 +1,5 @@
-{ mkDerivation, array, base, containers, mtl, stdenv, transformers
-, xhb, xhb-keysyms, xhb-mapping-state, xhb-monad, process
+{ mkDerivation, base, mtl, stdenv, transformers, xhb, xhb-keysyms
+, xhb-mapping-state, xhb-monad
 }:
 mkDerivation {
   pname = "tinywm";
@@ -8,8 +8,7 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    array base containers mtl transformers xhb xhb-keysyms
-    xhb-mapping-state xhb-monad process
+    base mtl transformers xhb xhb-keysyms xhb-mapping-state xhb-monad
   ];
   license = stdenv.lib.licenses.mit;
 }
