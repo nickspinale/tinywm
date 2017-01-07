@@ -21,7 +21,16 @@ import Graphics.XHB.MappingState.Internal
 import Graphics.XHB.KeySym.Defs
 
 
--- CONSTANTS
+main :: IO ()
+main = do
+    mconn <- connect
+    case mconn of
+        Nothing -> die "failed to connect to x server"
+        Just conn -> do
+            end <- unX (runMappingT tinywm) conn
+            case end of
+                Left err -> die (show err)
+                Right _ -> return ()
 
 
 noneId :: XidLike id => id
@@ -29,13 +38,6 @@ noneId = fromXid xidNone
 
 currentTime :: TIMESTAMP
 currentTime = noneId
-
-
--- MAIN
-
-
-main :: IO ()
-main = connect >>= maybe (die "failed to connect to x server") (setCrashOnError >> (unX (runMappingT tinywm) >=> either (die . show) return))
 
 tinywm :: (MonadX IO m, MappingCtx m) => m ()
 tinywm = void $ do
@@ -48,9 +50,6 @@ tinywm = void $ do
     evalStateT (forever eventLoop) Nothing
 
 
--- EVENT LOOP
-
-
 type TinyState = Maybe (WINDOW, Int16, Int16, MotionState)
 
 data MotionState = Moving Int16 Int16 | Resizing Word16 Word16
@@ -59,7 +58,6 @@ data EventHandler a = forall e. Event e => EventHandler (e -> a)
 
 handle :: MonadX x m => [EventHandler (m ())] -> SomeEvent -> m ()
 handle hs ev = fromMaybe (return ()) $ asum [ h `fmap` fromEvent ev | EventHandler h <- hs ]
-
 
 eventLoop :: MonadX IO m => StateT TinyState m ()
 eventLoop = lift awaitEv >>= handle
