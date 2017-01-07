@@ -109,7 +109,6 @@ onButtonRelease MkButtonReleaseEvent{..} = do
     notify $ MkUngrabPointer currentTime
 
 
-
 onMotionNotify :: (MonadX IO m, MonadState TinyState m) => MotionNotifyEvent -> m ()
 onMotionNotify MkMotionNotifyEvent{..} = do
     st <- get
