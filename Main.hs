@@ -21,36 +21,6 @@ import Graphics.XHB.MappingState.Internal
 import Graphics.XHB.KeySym.Defs
 
 
-main :: IO ()
-main = connect >>= maybe (die "failed to connect to x server") (setCrashOnError >> (unX (runMappingT tinywm) >=> either (die . show) return))
-
-
-tinywm :: (MonadX IO m, MappingCtx m) => m ()
-tinywm = void $ do
-    root <- asksX getRoot
-    km <- getsMapping keyMap
-    forM_ (keyCodesOf xK_x km) $ \kc -> notify $ MkGrabKey True root [ModMask1] kc GrabModeAsync GrabModeAsync
-    let grabButton ix = notify $ MkGrabButton True root [EventMaskButtonPress] GrabModeAsync GrabModeAsync noneId noneId ix [ModMask1]
-    grabButton ButtonIndex1
-    grabButton ButtonIndex3
-    evalStateT eventLoop Nothing
-
-
--- HANDLING
-
-
-data EventHandler a = forall e. Event e => EventHandler (e -> a)
-
-handle :: EventHandler a -> SomeEvent -> Maybe a
-handle (EventHandler h) ev = h `fmap` fromEvent ev
-
-handles :: [EventHandler a] -> SomeEvent -> Maybe a
-handles hs ev = asum $ map (flip handle ev) hs
-
-handles_ :: MonadX x m => [EventHandler (m ())] -> SomeEvent -> m ()
-handles_ = (.) (fromMaybe $ return ()) . handles
-
-
 -- CONSTANTS
 
 
@@ -60,8 +30,22 @@ noneId = fromXid xidNone
 currentTime :: TIMESTAMP
 currentTime = noneId
 
-noSymbol :: KEYSYM
-noSymbol = 0
+
+-- MAIN
+
+
+main :: IO ()
+main = connect >>= maybe (die "failed to connect to x server") (setCrashOnError >> (unX (runMappingT tinywm) >=> either (die . show) return))
+
+tinywm :: (MonadX IO m, MappingCtx m) => m ()
+tinywm = void $ do
+    root <- asksX getRoot
+    km <- getsMapping keyMap
+    forM (keyCodesOf xK_x km) $ \kc -> notify $ MkGrabKey True root [ModMask1] kc GrabModeAsync GrabModeAsync
+    let grabButton ix = notify $ MkGrabButton True root [EventMaskButtonPress] GrabModeAsync GrabModeAsync noneId noneId ix [ModMask1]
+    grabButton ButtonIndex1
+    grabButton ButtonIndex3
+    evalStateT (forever eventLoop) Nothing
 
 
 -- EVENT LOOP
@@ -71,9 +55,14 @@ type TinyState = Maybe (WINDOW, Int16, Int16, MotionState)
 
 data MotionState = Moving Int16 Int16 | Resizing Word16 Word16
 
+data EventHandler a = forall e. Event e => EventHandler (e -> a)
+
+handle :: MonadX x m => [EventHandler (m ())] -> SomeEvent -> m ()
+handle hs ev = fromMaybe (return ()) $ asum [ h `fmap` fromEvent ev | EventHandler h <- hs ]
+
 
 eventLoop :: MonadX IO m => StateT TinyState m ()
-eventLoop = forever $ lift awaitEv >>= handles_
+eventLoop = lift awaitEv >>= handle
     [ EventHandler onKeyPress
     , EventHandler onButtonPress
     , EventHandler onButtonRelease
@@ -82,22 +71,27 @@ eventLoop = forever $ lift awaitEv >>= handles_
 
 
 onKeyPress :: (MonadX IO m, MonadState TinyState m) => KeyPressEvent -> m ()
-onKeyPress MkKeyPressEvent{..} = notify . MkConfigureWindow child_KeyPressEvent $ toValueParam [(ConfigWindowStackMode, toValue StackModeAbove)]
+onKeyPress MkKeyPressEvent{..} = notify $ MkConfigureWindow child_KeyPressEvent param
+  where
+    param = toValueParam [(ConfigWindowStackMode, toValue StackModeAbove)]
 
 
 onButtonPress :: (MonadX IO m, MonadState TinyState m) => ButtonPressEvent -> m ()
 onButtonPress MkButtonPressEvent{..} = do
-    when (child_ButtonPressEvent /= noneId) $ do
-        MkGetGeometryReply{..} <- req . MkGetGeometry . fromXid . toXid $ child_ButtonPressEvent
+    when (child /= noneId) $ do
+        MkGetGeometryReply{..} <- req . MkGetGeometry . fromXid $ toXid child
         let continue motion = do
-            MkGrabPointerReply status <- req $ MkGrabPointer True child_ButtonPressEvent [EventMaskPointerMotion, EventMaskButtonRelease] GrabModeAsync GrabModeAsync noneId noneId currentTime
+            let mask = [EventMaskPointerMotion, EventMaskButtonRelease]
+            MkGrabPointerReply status <- req $ MkGrabPointer True child mask GrabModeAsync GrabModeAsync noneId noneId currentTime
             case status of
-                GrabStatusSuccess -> put $ Just (child_ButtonPressEvent, root_x_ButtonPressEvent, root_y_ButtonPressEvent, motion)
+                GrabStatusSuccess -> put $ Just (child, root_x_ButtonPressEvent, root_y_ButtonPressEvent, motion)
                 _ -> return ()
         case detail_ButtonPressEvent of
             1 -> continue $ Moving x_GetGeometryReply y_GetGeometryReply
             3 -> continue $ Resizing width_GetGeometryReply height_GetGeometryReply
             _ -> return ()
+  where
+    child = child_ButtonPressEvent
 
 
 onButtonRelease :: (MonadX IO m, MonadState TinyState m) => ButtonReleaseEvent -> m ()
