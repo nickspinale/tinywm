@@ -17,7 +17,6 @@ import Graphics.XHB
 import Graphics.XHB.Connection
 import Graphics.XHB.Monad
 import Graphics.XHB.MappingState
-import Graphics.XHB.MappingState.Internal
 import Graphics.XHB.KeySym.Defs
 
 
@@ -60,7 +59,7 @@ handle :: MonadX x m => [EventHandler (m ())] -> SomeEvent -> m ()
 handle hs ev = fromMaybe (return ()) $ asum [ h `fmap` fromEvent ev | EventHandler h <- hs ]
 
 eventLoop :: MonadX IO m => StateT TinyState m ()
-eventLoop = lift awaitEv >>= handle
+eventLoop = lift waitEvent >>= handle
     [ EventHandler onKeyPress
     , EventHandler onButtonPress
     , EventHandler onButtonRelease
