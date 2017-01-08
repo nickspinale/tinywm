@@ -16,6 +16,7 @@ import System.Exit
 import Graphics.XHB
 import Graphics.XHB.Connection
 import Graphics.XHB.Monad
+import Graphics.XHB.EventQueue
 import Graphics.XHB.MappingState
 import Graphics.XHB.KeySym.Defs
 
@@ -26,7 +27,7 @@ main = do
     case mconn of
         Nothing -> die "failed to connect to x server"
         Just conn -> do
-            end <- unX (runMappingT tinywm) conn
+            end <- unX (runMappingT (runEventQueueT tinywm)) conn
             case end of
                 Left err -> die (show err)
                 Right _ -> return ()
@@ -38,7 +39,7 @@ noneId = fromXid xidNone
 currentTime :: TIMESTAMP
 currentTime = noneId
 
-tinywm :: (MonadX IO m, MappingCtx m) => m ()
+tinywm :: (MonadX IO m, EventQueueCtx m, MappingCtx m) => m ()
 tinywm = void $ do
     root <- asksX getRoot
     km <- getsMapping keyMap
@@ -58,7 +59,7 @@ data EventHandler a = forall e. Event e => EventHandler (e -> a)
 handle :: MonadX x m => [EventHandler (m ())] -> SomeEvent -> m ()
 handle hs ev = fromMaybe (return ()) $ asum [ h `fmap` fromEvent ev | EventHandler h <- hs ]
 
-eventLoop :: MonadX IO m => StateT TinyState m ()
+eventLoop :: (MonadX IO m, EventQueueCtx m) => StateT TinyState m ()
 eventLoop = lift waitEvent >>= handle
     [ EventHandler onKeyPress
     , EventHandler onButtonPress
@@ -97,8 +98,10 @@ onButtonRelease MkButtonReleaseEvent{..} = do
     notify $ MkUngrabPointer currentTime
 
 
-onMotionNotify :: (MonadX IO m, MonadState TinyState m) => MotionNotifyEvent -> m ()
-onMotionNotify MkMotionNotifyEvent{..} = do
+onMotionNotify :: (MonadX IO m, EventQueueCtx m, MonadState TinyState m) => MotionNotifyEvent -> m ()
+onMotionNotify ev = do
+    flushEventQueue
+    MkMotionNotifyEvent{..} <- fromMaybe ev <$> skipEventsByType
     st <- get
     case st of
         Nothing -> return ()

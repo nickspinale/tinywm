@@ -19,4 +19,5 @@ executable tinywm
                    , xhb
                    , xhb-keysyms
                    , xhb-monad
+                   , xhb-event-queue
                    , xhb-mapping-state
